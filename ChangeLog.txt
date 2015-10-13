@@ -1,0 +1,54 @@
+Version 3.1
+===============================================================================
+* Removed the custom code for managing resources in StringExtensions
+* Corrected the conditions tested in DataExtensionsUnitTest.GetDataRowTest
+* Reworked the StringExtensions.ToMD5 function; added ToSHA1 and ToSHA256
+* Added NameValueCollectionExtensions, which includes GetBoolean, GetGuid, GetInt32, GetString, GetStringCollection, and GetTimeSpan
+
+Version 3.0
+===============================================================================
+* Removed the SharpCoreNullableTypes project from the solution, since nullable types were introduced in version 2.0 of the .NET Framework
+* Added SharpCore.Extensions, which provides extension methods for System.String
+* Added SharpCore.Extensions.Testing, the unit tests for SharpCore.Extensions
+
+Version 2.2.1
+===============================================================================
+* Removed the unit tests results folder, which significantly reduced the zip file size
+* Updated the release notes to include version 2.2
+
+Version 2.2
+===============================================================================
+* Refactoring of SharpCore.Data to include System.Transactions support
+* SharpCore.Caching and SharpCore.Logging now use SharpCore.Data
+
+Version 2.1.1
+===============================================================================
+* Corrected a bug in the SqlParameter caching.
+
+Version 2.1
+===============================================================================
+* Added the SharpCore.Transactions and SharpCore.Data assemblies/namespaces.
+* Moved the SharpCore.Utilities.SqlClientUtility to the SharpCore.Data
+namespace.
+* Introduced stored procedure parameter discovery and caching, so that
+instances of SqlParameter no longer have to be created and passed into data
+access methods.
+
+Version 2.0.2
+===============================================================================
+* Updated the MessageQueueCache to rethow the original exception when any 
+MessageQueue exceptions whose MessageQueueErrorCode is not an IOTimeout (IO 
+timeouts occur when there are no message in the queue).  In other words,
+"throw;" is used instead of "throw e;" so that the call stack can be preserved.
+
+Version 2.0.1
+===============================================================================
+* Corrected the SharpCore.Scheduling.Testing.SchedulingUnitTest so that it
+functions correctly.  The issue turned out to be that the Scheduler was
+referencing a different instance than the unit test was.
+* Updated SharpCore.Scheduling.Scheduler to use an IList<ISubscriber>
+collection instead of an ArrayList.
+
+Version 2.0.0
+===============================================================================
+Initial verstion targeting the 2.0 version of the .NET Framework.

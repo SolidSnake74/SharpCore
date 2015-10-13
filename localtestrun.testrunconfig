@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRunConfiguration id="b3e1859b-624b-4760-9b0e-afa79fc5435b" name="Local Test Run" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Description>This is a default test run configuration for a local test run.</Description>
+  <CodeCoverage enabled="true" instrumentInPlace="true">
+    <Regular>
+      <CodeCoverageItem binaryFile="SharpCore.Caching\bin\Debug\SharpCore.Caching.dll" pdbFile="SharpCore.Caching\bin\Debug\SharpCore.Caching.pdb" />
+      <CodeCoverageItem binaryFile="SharpCore.Collections\bin\Debug\SharpCore.Collections.dll" pdbFile="SharpCore.Collections\bin\Debug\SharpCore.Collections.pdb" />
+      <CodeCoverageItem binaryFile="SharpCore.Communications\bin\Debug\SharpCore.Communications.dll" pdbFile="SharpCore.Communications\bin\Debug\SharpCore.Communications.pdb" />
+      <CodeCoverageItem binaryFile="SharpCore.Logging\bin\Debug\SharpCore.Logging.dll" pdbFile="SharpCore.Logging\bin\Debug\SharpCore.Logging.pdb" />
+      <CodeCoverageItem binaryFile="SharpCore.NullableTypes\bin\Debug\SharpCore.NullableTypes.dll" pdbFile="SharpCore.NullableTypes\bin\Debug\SharpCore.NullableTypes.pdb" />
+      <CodeCoverageItem binaryFile="SharpCore.Objects\bin\Debug\SharpCore.Objects.dll" pdbFile="SharpCore.Objects\bin\Debug\SharpCore.Objects.pdb" />
+      <CodeCoverageItem binaryFile="SharpCore.Scheduling\bin\Debug\SharpCore.Scheduling.dll" pdbFile="SharpCore.Scheduling\bin\Debug\SharpCore.Scheduling.pdb" />
+      <CodeCoverageItem binaryFile="SharpCore.Utilities\bin\Debug\SharpCore.Utilities.dll" pdbFile="SharpCore.Utilities\bin\Debug\SharpCore.Utilities.pdb" />
+    </Regular>
+    <AspNet />
+  </CodeCoverage>
+  <Timeouts runTimeout="0" testTimeout="300000" agentNotRespondingTimeout="300000" deploymentTimeout="300000" />
+  <Deployment />
+  <NamingScheme />
+  <Hosts />
+</TestRunConfiguration>
