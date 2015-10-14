@@ -68,5 +68,121 @@ namespace SharpCore.Data.Testing
 			}
 		}
 		#endregion
+
+        [TestMethod]
+        public void TransactionTest_Session()
+        {
+            SessionFactory sf = new SessionFactory("ConnectionString");
+           
+            if(sf!= null)
+            {                               
+                SqlDataReader dr = null;
+                SqlDataReader dr2 = null;
+                                
+                using (ISessionTX ses = sf.OpenSession() as ISessionTX)
+                {                    
+                    dr = SqlClientUtility.ExecuteReader(ses.ConnectionManager, "PadreSelectAll");
+                    dr.Close();
+                   
+                    dr2 = SqlClientUtility.ExecuteReader(ses.ConnectionManager, "HijoSelectAllByPadre", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32){Value=0} });
+                    dr2.Close();
+                }
+
+                sf.Close();
+            }
+            
+        }
+
+        [TestMethod]
+        public void TransactionTest_Session_update()
+        {
+            SessionFactory sf = new SessionFactory("ConnectionString");
+
+            if (sf != null)
+            {
+                SqlDataReader dr = null;
+                SqlDataReader dr2 = null;
+
+                using (ISessionTX ses = sf.OpenSession() as ISessionTX)
+                {
+                    using (TransactionScope tx = ses.GetTransactScope())
+                    {
+                        SqlClientUtility.ExecuteNonQuery(ses.ConnectionManager, "PadreUpdate", new SqlParameter[] { new SqlParameter("@Id", DbType.Int32) { Value = 0 }, 
+                                                                                                                  new SqlParameter("@Nombre", DbType.String) { Value = DateTime.Now.ToLongTimeString() }});
+
+                        SqlClientUtility.ExecuteNonQuery(ses.ConnectionManager, "PadreUpdate", new SqlParameter[] { new SqlParameter("@Id", DbType.Int32) { Value = 1 }, 
+                                                                                                                  new SqlParameter("@Nombre", DbType.String) { Value = DateTime.Now.ToLongTimeString() }});
+
+                        tx.Complete();
+                    }
+
+                    dr = SqlClientUtility.ExecuteReader(ses.ConnectionManager, "PadreSelectAll");
+                    dr.Close();
+
+                    dr2 = SqlClientUtility.ExecuteReader(ses.ConnectionManager, "HijoSelectAllByPadre", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 0 } });
+                    dr2.Close();
+                }
+
+                sf.Close();
+            }
+
+        }
+
+        [TestMethod]
+        public void TransactionTest_Session_update2()
+        {
+            SessionFactory sf = new SessionFactory("ConnectionString");
+
+            if (sf != null)
+            {
+                //SqlDataReader dr = null;
+                //SqlDataReader dr2 = null;
+
+               
+
+                using (ISessionTX ses = sf.OpenSession() as ISessionTX)
+                {
+
+                    using (TransactionScope ts = ses.GetTransactScope())
+                    {
+
+                        using (ITransaction tx = ses.BeginTransaction())
+                        {
+                            SqlClientUtility.ExecuteNonQuery(ses.ConnectionManager, "PadreUpdate", new SqlParameter[] { new SqlParameter("@Id", DbType.Int32) { Value = 0 }, 
+                                                                                                                  new SqlParameter("@Nombre", DbType.String) { Value = DateTime.Now.ToLongTimeString() }});
+
+                            SqlClientUtility.ExecuteNonQuery(ses.ConnectionManager, "PadreUpdate", new SqlParameter[] { new SqlParameter("@Id", DbType.Int32) { Value = 1 }, 
+                                                                                                                  new SqlParameter("@Nombre", DbType.String) { Value = DateTime.Now.ToLongTimeString() }});
+
+                            tx.Commit();
+                        }
+
+                        using (ITransaction tx = ses.BeginTransaction())
+                        {
+                            SqlClientUtility.ExecuteNonQuery(ses.ConnectionManager, "HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 0 }, 
+                                                                                                                       new SqlParameter("@Id", DbType.Int32) { Value = 1 }, 
+                                                                                                                       new SqlParameter("@Nombre", DbType.String) { Value = DateTime.Now.ToLongTimeString() }});
+
+                            SqlClientUtility.ExecuteNonQuery(ses.ConnectionManager, "HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 1 }, 
+                                                                                                                       new SqlParameter("@Id", DbType.Int32) { Value = 0 }, 
+                                                                                                                       new SqlParameter("@Nombre", DbType.String) { Value = DateTime.Now.ToLongTimeString() }});
+                            //tx.Rollback();
+                            tx.Commit();
+                        }
+
+                        //ts.Complete();
+                    }
+
+                    //dr = SqlClientUtility.ExecuteReader(ses.ConnectionManager, "PadreSelectAll");
+                    //dr.Close();
+
+                    //dr2 = SqlClientUtility.ExecuteReader(ses.ConnectionManager, "HijoSelectAllByPadre", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 0 } });
+                    //dr2.Close();
+                }
+
+                sf.Close();
+            }
+
+        }
 	}
 }

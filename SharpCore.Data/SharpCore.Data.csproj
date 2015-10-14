@@ -64,8 +64,26 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AdoTransaction.cs" />
+    <Compile Include="CnnManager.cs" />
+    <Compile Include="ConnectionReleaseMode.cs" />
+    <Compile Include="ICnnManager.cs" />
+    <Compile Include="ITransaction.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Session\BaseDAL.cs" />
+    <Compile Include="Session\CurrentSessionContext.cs" />
+    <Compile Include="Session\ICurrentSessionContext.cs" />
+    <Compile Include="Session\ISession.cs" />
+    <Compile Include="Session\ISessionFactory.cs" />
+    <Compile Include="Session\ISessionTX.cs" />
+    <Compile Include="Session\ITransactionContext.cs" />
+    <Compile Include="Session\Session.cs" />
+    <Compile Include="Session\SessionExt.cs" />
+    <Compile Include="Session\SessionFactory.cs" />
+    <Compile Include="Session\ThreadStaticSessionContext.cs" />
+    <Compile Include="Session\TwoKeyDictionary.cs" />
     <Compile Include="SqlClientUtility.cs" />
+    <Compile Include="TraceLog.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">
