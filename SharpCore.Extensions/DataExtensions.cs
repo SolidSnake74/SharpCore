@@ -784,5 +784,171 @@ namespace SharpCore.Extensions
 		}
 
 		#endregion
-	}
+
+        #region Anexos útiles MJBF
+
+        /// <summary>
+        /// Attempts to extract the requested column value from a DataRow.
+        /// </summary>
+        /// <param name="dataRow">The DataRow to extract the column value from.</param>
+        /// <param name="columnName">The name of the column to extract the value from.</param>
+        /// <param name="valueIfNull">The value to return if the requested column value is null or DBNull.Value.</param>
+        /// <returns>The value contained in the requested column if the value is not null or DBNull.Value, otherwise null.</returns>
+        public static TimeSpan GetTimeSpan(this DataRow dataRow, string columnName, TimeSpan valueIfNull)
+        {
+            object value = GetObject(dataRow, columnName, null);
+            if (value != null)
+            {
+                if (value is TimeSpan)
+                {
+                    return (TimeSpan)value;
+                }
+                else
+                {
+                    return TimeSpan.Parse(value.ToString());
+                }
+            }
+            else
+            {
+                return valueIfNull;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to extract the requested column value from a SqlDataReader.
+        /// </summary>
+        /// <param name="dataReader">The SqlDataReader to extract the column value from.</param>
+        /// <param name="columnName">The name of the column to extract the value from.</param>
+        /// <param name="valueIfNull">The value to return if the requested column value is null or DBNull.Value.</param>
+        /// <returns>The value contained in the requested column if the value is not null or DBNull.Value, otherwise null.</returns>
+        public static TimeSpan GetTimeSpan(this SqlDataReader dataReader, string columnName, TimeSpan valueIfNull)
+        {
+            object value = GetObject(dataReader, columnName, null);
+            if (value != null)
+            {
+                if (value is TimeSpan)
+                {
+                    return (TimeSpan)value;
+                }
+                else
+                {
+                    return TimeSpan.Parse(value.ToString());
+                }
+            }
+            else
+            {
+                return valueIfNull;
+            }
+        }
+
+        ///// <summary>
+        ///// Attempts to extract the requested column value from a DataRow.
+        ///// </summary>
+        ///// <param name="dataRow">The DataRow to extract the column value from.</param>
+        ///// <param name="columnName">The name of the column to extract the value from.</param>
+        ///// <param name="valueIfNull">The value to return if the requested column value is null or DBNull.Value.</param>
+        ///// <returns>The value contained in the requested column if the value is not null or DBNull.Value, otherwise null.</returns>
+        //public static SqlHierarchyId GetSqlHierarchyId(this DataRow dataRow, string columnName, SqlHierarchyId valueIfNull)
+        //{
+        //    object value = GetObject(dataRow, columnName, null);
+        //    if (value != null)
+        //    {
+        //        if (value is SqlHierarchyId)
+        //        {
+        //            return (SqlHierarchyId)value;
+        //        }
+        //        else
+        //        {
+        //            return SqlHierarchyId.Parse(value.ToString());
+        //        }
+        //    }
+        //    else
+        //    {
+        //        return valueIfNull;
+        //    }
+        //}
+
+        ///// <summary>
+        ///// Attempts to extract the requested column value from a SqlDataReader.
+        ///// </summary>
+        ///// <param name="dataReader">The SqlDataReader to extract the column value from.</param>
+        ///// <param name="columnName">The name of the column to extract the value from.</param>
+        ///// <param name="valueIfNull">The value to return if the requested column value is null or DBNull.Value.</param>
+        ///// <returns>The value contained in the requested column if the value is not null or DBNull.Value, otherwise null.</returns>
+        //public static SqlHierarchyId GetSqlHierarchyId(this SqlDataReader dataReader, string columnName, SqlHierarchyId valueIfNull)
+        //{
+        //    object value = GetObject(dataReader, columnName, null);
+        //    if (value != null)
+        //    {
+        //        if (value is SqlHierarchyId)
+        //        {
+        //            return (SqlHierarchyId)value;
+        //        }
+        //        else
+        //        {
+        //            return SqlHierarchyId.Parse(value.ToString());
+        //        }
+        //    }
+        //    else
+        //    {
+        //        return valueIfNull;
+        //    }
+        //}
+
+        /// <summary>
+        /// Attempts to extract the requested column value from a DataRow.
+        /// </summary>
+        /// <param name="dataRow">The DataRow to extract the column value from.</param>
+        /// <param name="columnName">The name of the column to extract the value from.</param>
+        /// <param name="valueIfNull">The value to return if the requested column value is null or DBNull.Value.</param>
+        /// <returns>The value contained in the requested column if the value is not null or DBNull.Value, otherwise null.</returns>
+        public static float GetFloat(this DataRow dataRow, string columnName, float valueIfNull)
+        {
+            object value = GetObject(dataRow, columnName, null);
+            if (value != null)
+            {
+                if (value is float)
+                {
+                    return (float)value;
+                }
+                else
+                {
+                    return float.Parse(value.ToString());
+                }
+            }
+            else
+            {
+                return valueIfNull;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to extract the requested column value from a SqlDataReader.
+        /// </summary>
+        /// <param name="dataReader">The SqlDataReader to extract the column value from.</param>
+        /// <param name="columnName">The name of the column to extract the value from.</param>
+        /// <param name="valueIfNull">The value to return if the requested column value is null or DBNull.Value.</param>
+        /// <returns>The value contained in the requested column if the value is not null or DBNull.Value, otherwise null.</returns>
+        public static float GetFloat(this SqlDataReader dataReader, string columnName, float valueIfNull)
+        {
+            object value = GetObject(dataReader, columnName, null);
+            if (value != null)
+            {
+                if (value is float)
+                {
+                    return (float)value;
+                }
+                else
+                {
+                    return float.Parse(value.ToString());
+                }
+            }
+            else
+            {
+                return valueIfNull;
+            }
+        }
+
+        #endregion
+    }
 }
