@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Transactions;
+//using System.Transactions;
 
 
 namespace SharpCore.Data
@@ -58,9 +58,6 @@ namespace SharpCore.Data
         bool IsAutoCloseSessionEnabled { get; }
         bool ShouldAutoClose { get; }
 
-        TransactionScope GetTransactScope();
-        TransactionScope GetTransactScope(long tOut_mseg);
-
         void AfterTransactionBegin(ITransaction tx);
         void AfterTransactionCompletion(bool successful, ITransaction tx);
 
@@ -70,9 +67,7 @@ namespace SharpCore.Data
 
         #endregion
 
-
-        //short RootNode { get; }
-        //List<short> ServersLoaded { get; }
-
+        //TransactionScope GetTransactScope();
+        //TransactionScope GetTransactScope(long tOut_mseg);        
     }    
 }

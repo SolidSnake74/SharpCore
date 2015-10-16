@@ -31,7 +31,7 @@ namespace SharpCore.Data
 
             TraceLog.LogEntry("SessionExt(): Session Id: {0}", this.sessionId);
 
-            CheckAndUpdateSessionStatus();
+            this.CheckAndUpdateSessionStatus();
           
       
             //this.ServersLoad();
@@ -53,15 +53,27 @@ namespace SharpCore.Data
 
         protected internal void CheckAndUpdateSessionStatus()
         {
-            ErrorIfClosed();
-            EnlistInAmbientTransactionIfNeeded();
+            TraceLog.LogEntry("SessionExt.CheckAndUpdateSessionStatus()");
+            this.ErrorIfClosed();
+            this.EnlistInAmbientTransactionIfNeeded();
         }
 
         public override bool TransactionInProgress
         {
             get
             {
-                return !IsClosed && Transaction.IsActive;
+                return !this.IsClosed && this.Transaction.IsActive;
+            }
+        }
+
+        public bool IsInActiveTransaction
+        {
+            get
+            {
+                if (this.m_cnnMngr == null)
+                    return false;
+                else
+                    return this.m_cnnMngr.IsInActiveTransaction;
             }
         }
 
@@ -76,9 +88,9 @@ namespace SharpCore.Data
         /// Demark beggining of an scope... No timeout defined.
         /// </summary>
         /// <returns></returns>
-        public override TransactionScope GetTransactScope()
+        public TransactionScope GetTransactScope()
         {
-            return GetTransactScope(0);
+            return this.GetTransactScope(0);
         }
 
         /// <summary>
@@ -86,9 +98,11 @@ namespace SharpCore.Data
         /// </summary>
         /// <param name="tOut_mseg">Set timeout for Scope in mseg... zero means infinite (no timeout)</param>
         /// <returns></returns>
-        public override TransactionScope GetTransactScope(long tOut_mseg)
-        {           
-            return new TransactionScope(TransactionScopeOption.Required, TimeSpan.FromMilliseconds(tOut_mseg));
+        public TransactionScope GetTransactScope(long tOut_mseg)
+        {                       
+            TransactionScope ts= new TransactionScope(TransactionScopeOption.Required, TimeSpan.FromMilliseconds(tOut_mseg));
+            TraceLog.LogEntry("SessionExt.GetTransactScope(tOut_mseg= {0}): SessionId= {1}", tOut_mseg, this.sessionId);            
+            return ts;            
         }
         
         public override T GetDAO<T>()
@@ -112,7 +126,7 @@ namespace SharpCore.Data
             }
         }
 
-        public ICnnManager ConnectionManager
+        internal ICnnManager ConnectionManager
         {
             get { return this.m_cnnMngr; }
         }
@@ -130,22 +144,15 @@ namespace SharpCore.Data
 
         public bool IsOpen
         {
-            get { return !closed; }
+            get { return !this.closed; }
         }
      
         public override IDbConnection Disconnect()
-        {
-            IDbConnection res = null;
-
-            // SharpLogger.CallerIn();
-
-            CheckAndUpdateSessionStatus();
-            TraceLog.LogEntry(this, "disconnecting session");
-            res= this.m_cnnMngr.Disconnect();
-            
-            // SharpLogger.CallerOut();
-
-            return res;
+        {            
+            TraceLog.LogEntry("SessionExt.Disconnect(): SessionId= {0}",this.sessionId);
+            this.CheckAndUpdateSessionStatus();            
+            TraceLog.LogEntry("SessionExt.Disconnect(): disconnecting session");
+            return this.m_cnnMngr.Disconnect();
         }
 
         /// <summary>
@@ -159,8 +166,9 @@ namespace SharpCore.Data
         {
             //using (new SessionIdLoggingContext(SessionId))
             //{
-                TraceLog.LogEntry(this, "closing session");
-                if (IsClosed) throw new Exception("Session was already closed");
+                TraceLog.LogEntry("SessionExt.Close(): SessionId= {0}", base.sessionId);
+
+                if (this.IsClosed) throw new Exception("Session was already closed");
                
 
                 //if (Factory.Statistics.IsStatisticsEnabled)
@@ -192,7 +200,7 @@ namespace SharpCore.Data
                 finally
                 {
                     
-                    SetClosed();
+                    base.SetClosed();
                               
 
                     // SharpLogger.CallerOut();
@@ -202,13 +210,13 @@ namespace SharpCore.Data
 
         protected internal void ErrorIfClosed()
         {
-            if (IsClosed || IsAlreadyDisposed)
+            if (this.IsClosed || this.IsAlreadyDisposed)
             {
                 throw new ObjectDisposedException("ISession", "Session is closed!");
             }
         }
       
-        public ITransaction Transaction
+        internal ITransaction Transaction
         {
             get             
             {
@@ -220,8 +228,8 @@ namespace SharpCore.Data
                 
         }
 
-        public ITransaction BeginTransaction(System.Data.IsolationLevel isolationLevel)
-        {
+        internal ITransaction BeginTransaction(System.Data.IsolationLevel isolationLevel)
+        {           
             //using (new SessionIdLoggingContext(SessionId))
             //{
             //    if (rootSession != null)
@@ -231,13 +239,14 @@ namespace SharpCore.Data
             //    // SharpLogger.Nfo("Transaction started on non-root session");
             //}
 
-            CheckAndUpdateSessionStatus();
+            TraceLog.LogEntry("SessionExt.BeginTransaction(" + Enum.GetName(typeof(System.Data.IsolationLevel), isolationLevel) + ")");
+            this.CheckAndUpdateSessionStatus();
             return this.m_cnnMngr.BeginTransaction(isolationLevel);
             //}
         }
 
-        public ITransaction BeginTransaction()
-        {
+        internal ITransaction BeginTransaction()
+        {            
             //using (new SessionIdLoggingContext(SessionId))
             //{
             //if (rootSession != null)
@@ -247,20 +256,16 @@ namespace SharpCore.Data
             //    // SharpLogger.Nfo("Transaction started on non-root session");
             //}
 
-            CheckAndUpdateSessionStatus();
+            TraceLog.LogEntry("SessionExt.BeginTransaction()");
+            this.CheckAndUpdateSessionStatus();
             return this.m_cnnMngr.BeginTransaction();
             //}
         }
 
-        public ISession GetSessionImplementation()
-        {
-            return this;
-        }
-
         public override void AfterTransactionBegin(ITransaction tx)
         {
-
-            CheckAndUpdateSessionStatus();
+            TraceLog.LogEntry("SessionExt.AfterTransactionBegin(tx 0x{0:X})", (tx == null) ? -1 : tx.GetHashCode());
+            this.CheckAndUpdateSessionStatus();
             //interceptor.AfterTransactionBegin(tx);            
         }
 
@@ -270,10 +275,8 @@ namespace SharpCore.Data
         /// </summary>
         public override void AfterTransactionCompletion(bool success, ITransaction tx)
         {
-            if (tx != null)
-                TraceLog.LogEntry("AfterTransactionCompletion(): success {0},tx 0x{1:X}", success, tx.GetHashCode());
-            else
-                TraceLog.LogEntry("AfterTransactionCompletion(): success {0},tx NULL", success);
+
+            TraceLog.LogEntry("SessionExt.AfterTransactionCompletion(success {0}, tx 0x{1:X})", success, (tx == null) ? -1 : tx.GetHashCode());
 
             //using (new SessionIdLoggingContext(SessionId))
             //{
@@ -308,10 +311,6 @@ namespace SharpCore.Data
         }
 
         #region System.IDisposable Members
-
-
-
-
 
         /// <summary>
         /// Finalizer that ensures the object is correctly disposed of.
@@ -364,7 +363,7 @@ namespace SharpCore.Data
 
 
 
-            if (IsAlreadyDisposed)
+            if (this.IsAlreadyDisposed)
             {
                 // don't dispose of multiple times.
 
@@ -376,9 +375,9 @@ namespace SharpCore.Data
 
             // free managed resources that are being managed by the session if we
             // know this call came through Dispose()
-            if (p_disposing && !IsClosed)
+            if (p_disposing && !this.IsClosed)
             {
-                Close();
+                this.Close();
             }
 
             // free unmanaged resources here
@@ -441,5 +440,10 @@ namespace SharpCore.Data
 
         //    // SharpLogger.CallerOut();
         //} 
+
+        //public ISession GetSessionImplementation()
+        //{
+        //    return this;
+        //}
     }
 }

@@ -5,7 +5,7 @@ using System.Data;
 
 namespace SharpCore.Data
 {
-    internal class AdoTransaction:ITransaction
+    internal class AdoTransaction: ITransaction
     {
         ISessionTX session = null;
 
@@ -33,7 +33,7 @@ namespace SharpCore.Data
         public void Begin()
         {
             //SharpLogger.CallerIn();
-            Begin(IsolationLevel.Unspecified);
+            this.Begin(IsolationLevel.Unspecified);
             //SharpLogger.CallerOut();
         }
 
@@ -46,7 +46,7 @@ namespace SharpCore.Data
                 return;
             }
 
-            if (commitFailed)
+            if (this.commitFailed)
             {
                 throw new System.Transactions.TransactionException("Cannot restart transaction after failed commit");
             }
@@ -105,11 +105,10 @@ namespace SharpCore.Data
 
             //using (new SessionIdLoggingContext(sessionId))
             //{
-                CheckNotDisposed();
-                CheckBegun();
-                CheckNotZombied();
 
-                
+                this.CheckNotDisposed();
+                this.CheckBegun();
+                this.CheckNotZombied();
 
                 //if (session.FlushMode != FlushMode.Never)
                 //{
@@ -123,23 +122,23 @@ namespace SharpCore.Data
 
                 try
                 {
-                    trans.Commit();
+                    this.trans.Commit();
                     this.committed = !this.commitFailed;
                     TraceLog.LogEntry("Trans. " + m_hashc + " Committed!");                                       
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {                                      
                     //SharpLogger.Error(e,String.Format("Commit Transaction {0} failed with SQL exception",m_hashc));                    
-                    this.committed= !(commitFailed = true);
+                    this.committed = !(this.commitFailed = true);
 
                     // Don't wrap SharpCore.Data Exceptions:
-                    throw new System.Transactions.TransactionException("Commit failed.", e);
+                    throw new System.Transactions.TransactionException("Commit failed.", ex);
                 }     
                 finally
                 {
-                    AfterTransactionCompletion(committed && !commitFailed);
-                    Dispose();
-                    CloseIfRequired();
+                    this.AfterTransactionCompletion(committed && !this.commitFailed);
+                    this.Dispose();
+                    //this.CloseIfRequired();
                 }
             //}
         }
@@ -149,18 +148,20 @@ namespace SharpCore.Data
             string m_hashc = "NULL";
             if (this.trans != null) m_hashc = String.Format("0x{0:X}", this.trans.GetHashCode());
 
-            TraceLog.LogEntry("Trans. " + m_hashc + " RollBack...");    
+            TraceLog.LogEntry("AdoTransaction.Rollback(): Transaction " + m_hashc + "...");    
 
-            CheckNotDisposed();
-            CheckBegun();
-            CheckNotZombied();
+            this.CheckNotDisposed();
+            this.CheckBegun();
+            this.CheckNotZombied();
 
-            if (!commitFailed)
+            if (this.commitFailed)
+                TraceLog.LogEntry(this, "Rollback(): Skipped rollbacking transaction " + m_hashc + " because this.commitFailed is True.");
+            else
             {
                 try
                 {
-                    trans.Rollback();                    
-                    rolledBack = true;                   
+                    this.trans.Rollback();
+                    this.rolledBack = true;                   
                 }
                 catch (Exception e)
                 {
@@ -170,24 +171,28 @@ namespace SharpCore.Data
                 }
                 finally
                 {
-                    AfterTransactionCompletion(false);                    
-                    Dispose();
-                    CloseIfRequired();
-                    if(rolledBack) TraceLog.LogEntry("Trans. " + m_hashc + " RollBack...");    
+                    this.AfterTransactionCompletion(this.rolledBack);                    
+                    this.Dispose();
+                    //this.CloseIfRequired();
+
+                    if (this.rolledBack) 
+                        TraceLog.LogEntry(this, "Rollback(): Transaction" + m_hashc + " succesfully RollBacked.");    
+                    else
+                        TraceLog.LogEntry(this, "Rollback(): Transaction" + m_hashc + " failed.");    
                 }
-            }
+            }                               
         }
 
         private void AfterTransactionCompletion(bool successful)
         {
-            TraceLog.LogEntry("* AfterTransactionCompletion(): Hash= 0x{0:X} successful= {1} ", this.trans.GetHashCode(), successful);
+            //TraceLog.LogEntry("* AfterTransactionCompletion(): Hash= 0x{0:X} successful= {1} ", this.trans.GetHashCode(), successful);
 
             //using (new SessionIdLoggingContext(sessionId))
             {
                 this.session.AfterTransactionCompletion(successful, this);
                 this.NotifyLocalSynchsAfterTransactionCompletion(successful);
-                //session = null;
-                begun = false;
+                this.session = null;
+                this.begun = false;
             }
 
            
@@ -205,7 +210,7 @@ namespace SharpCore.Data
 		/// </value>
 		public bool WasRolledBack
 		{
-			get { return rolledBack; }
+            get { return this.rolledBack; }
 		}
 
 		/// <summary>
@@ -217,12 +222,12 @@ namespace SharpCore.Data
 		/// </value>
 		public bool WasCommitted
 		{
-			get { return committed; }
+            get { return this.committed; }
 		}
 
 		public bool IsActive
 		{
-			get { return begun && !rolledBack && !committed; }
+            get { return this.begun && !this.rolledBack && !this.committed; }
 		}
 
         /// <summary>
@@ -232,17 +237,17 @@ namespace SharpCore.Data
 		{
 			get 
             {
-                if (trans == null)
+                if (this.trans == null)
                     return IsolationLevel.Unspecified;                
                 else
-                    return trans.IsolationLevel; 
+                    return this.trans.IsolationLevel; 
             }
 		}
 
-		void CloseIfRequired()
-		{
-            // Eliminar...
-		}
+        //void CloseIfRequired()
+        //{
+        //    // Eliminar...
+        //}
 
         /// <summary>
         /// Enlist the <see cref="IDbCommand"/> in the current <see cref="ITransaction"/>.
@@ -259,46 +264,44 @@ namespace SharpCore.Data
         /// </para>
         /// </remarks>
         public void Enlist(IDbCommand command)
-        {
-            if (trans == null)
+        {            
+            if (this.trans == null)
             {
-                //if (command.Transaction != null)
-                //    SharpLogger.Nfo("set a nonnull IDbCommand.Transaction to null because the Session had no Transaction");
-
-                command.Transaction = null;                
+                if (command.Transaction != null)
+                {
+                    TraceLog.LogEntry("AdoTransaction.EnList('{1}'): Found NOT-NULL preexistent IDbCommand.Transaction (0x{0:X}), it will be setted to NULL,  because attached Session had no Transaction.", command.Transaction.GetHashCode(), command.CommandText);
+                    command.Transaction = null;                
+                }
+                else
+                    TraceLog.LogEntry("AdoTransaction.EnList('{0}'): Will be null setted the Non-Null preexistent IDbCommand.Transaction (NULL) because the Session had no Transaction", command.CommandText);                
             }
             else
             {
                 // got into here because the command was being initialized and had a null Transaction - probably
                 // don't need to be confused by that - just a normal part of initialization...
-
-                //if (command.Transaction != null && command.Transaction != trans)                
-                //    SharpLogger.Nfo("The IDbCommand had a different Transaction than the Session.");
-
-                if (command.Transaction == trans)
+                               
+                if (command.Transaction == this.trans)
                 {
+                    TraceLog.LogEntry("AdoTransaction.EnList('{1}'): this.trans ({0}) instance is same as pre-asigned to this command.", this.trans, command.CommandText);
                 }
                 else
                 {
+                    if (command.Transaction != null && command.Transaction != this.trans)
+                        TraceLog.LogEntry("AdoTransaction.EnList('{2}'): The IDbCommand had a different Transaction (0x{0:X}) than the Session 0x{1:X}.", command.Transaction.GetHashCode(), this.trans.GetHashCode(), command.CommandText);
+
                     // If you try to assign a disposed transaction to a command with MSSQL, it will leave the command's
                     // transaction as null and not throw an error.  With SQLite, for example, it will throw an exception
                     // here instead.  Because of this, we set the trans field to null in when Dispose is called.
-                    command.Transaction = trans;
 
-
-
-                    //string m_hashc = "NULL";
-                    //if (this.trans != null) m_hashc = String.Format("0x{0:X}", this.trans.GetHashCode());
-                    //SharpLogger.Nfo("Transaction {0} Enlists Command '{1}'", m_hashc, command.CommandText);
+                    command.Transaction = this.trans;
+                    //TraceLog.LogEntry("AdoTransaction.EnList(): Transaction instance 0x{0:X} was succesfully attached to '{1}' command.", command.Transaction.GetHashCode(), command.CommandText);
                 }
             }
         }
 
         private void NotifyLocalSynchsAfterTransactionCompletion(bool success)
-        {
-            
-
-            //SharpLogger.CallerIn("success: {0}",success);
+        {            
+            TraceLog.LogEntry("AdoTransaction.NotifyLocalSynchsAfterTransactionCompletion(success= " + success.ToString() + ")");
             begun = false;
 
             ////if (synchronizations != null)
@@ -374,14 +377,14 @@ namespace SharpCore.Data
                 {
                     if (trans != null)
                     {
-                        trans.Dispose();
-                        trans = null;
+                        this.trans.Dispose();
+                        this.trans = null;
                         //SharpLogger.Nfo("IDbTransaction {0} disposed.",m_hashc);
                     }
 
                     if (this.session != null)
                     {
-                        if (IsActive) AfterTransactionCompletion(false); // Assume we are rolled back   
+                        if (this.IsActive) this.AfterTransactionCompletion(false); // Assume we are rolled back   
                         //else
                         //    SharpLogger.Nfo("this.session!=NULL, AdoTransaction.Active=FALSE");
                                                           

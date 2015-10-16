@@ -217,20 +217,19 @@ namespace SharpCore.Data
 		{
 			LocalDataStoreSlot connectionDictionarySlot = Thread.GetNamedDataSlot("ConnectionDictionary");
 			Dictionary<string, SqlConnection> connectionDictionary = (Dictionary<string, SqlConnection>) Thread.GetData(connectionDictionarySlot);
+
+            TraceLog.LogEntry("Current_TransactionCompleted(): ID=     {0}  Distributed ID= {1}", e.Transaction.TransactionInformation.LocalIdentifier, e.Transaction.TransactionInformation.DistributedIdentifier);            
+            TraceLog.LogEntry("                                Status= {0}  IsolationLevel= {1}", e.Transaction.TransactionInformation.Status, e.Transaction.IsolationLevel);
             
 			if (connectionDictionary != null)
 			{
 				foreach (SqlConnection connection in connectionDictionary.Values)
 				{
-                    TraceLog.LogEntry("Current_TransactionCompleted(): (Connection, State) = (0x{0:X}, {1}) Transaction ({2}, Status: {3})", 
-                        connection == null ? -1 : connection.GetHashCode(), 
-                        connection == null ? "NULL" : connection.State.ToString(),
-                        e.Transaction.TransactionInformation.LocalIdentifier,
-                        e.Transaction.TransactionInformation.Status);
-
-					if (connection != null && connection.State != ConnectionState.Closed)
+                    TraceLog.LogEntry("Current_TransactionCompleted(): (Connection= 0x{0:X}, State= {1})",connection == null ? -1 : connection.GetHashCode(),connection == null ? "NULL" : connection.State.ToString());                        
+					
+                    if (connection != null && connection.State != ConnectionState.Closed)
 					{
-						connection.Close();
+						connection.Close(); 
 					}
 				}
 				
@@ -277,7 +276,6 @@ namespace SharpCore.Data
             SqlCommand command = connection.CreateCommand();
             command.CommandType = commandType;
             command.CommandText = commandText;
-
 			return command;
 		}
 		
@@ -289,9 +287,9 @@ namespace SharpCore.Data
         /// <param name="commandText">SP command name</param>
         /// <param name="parameters">parameters to build command.</param>
         /// <returns>Valid IDbCommand instance.</returns>
-        private static SqlCommand CreateCommand(SqlConnection connection, CommandType commandType, string commandText, params SqlParameter[] parameters)
+        private static SqlCommand CreateCommand(IDbConnection connection, CommandType commandType, string commandText, params SqlParameter[] parameters)
         {
-            SqlCommand command= SqlClientUtility.CreateCommand(connection, commandType, commandText);
+            SqlCommand command = SqlClientUtility.CreateCommand(connection as SqlConnection, commandType, commandText);
 
             if (parameters != null)
             {
@@ -372,92 +370,107 @@ namespace SharpCore.Data
 
         #region newest CreateCommand & ExecuteNonQuery & ExecuteReader
 
-       
-
-        public static void ExecuteNonQuery(ICnnManager p_cnnMgr, string commandText, params SqlParameter[] parameters)
-        {            
-            SqlConnection connection = null;
-
-            string strInfoExcep = String.Empty;
-
+        public static void ExecuteNonQuery(ISessionTX p_sessionTX, string commandText, params SqlParameter[] parameters)
+        {                        
             TraceLog.LogEntry("ExecuteNonQuery(): commandText= {0} parameters= {1}", commandText, parameters.Length);
 
             int res = -1;
             bool m_mustCloseSqlCnn = true;
-            string m_tx = "Transact: NONE";
-            
+            string m_tx = "NONE";
+            IDbConnection m_sqlCnn = null;
+            string strInfoExcep = String.Empty;
+
             long ticks_t0 = DateTime.Now.Ticks;
 
-            if (Transaction.Current == null)            
-                connection = p_cnnMgr.GetConnection() as SqlConnection;     // Root session connection will be used...                            
+            if (Transaction.Current == null)
+                m_sqlCnn= p_sessionTX.Connection; //p_sessionTX.ConnectionManager.GetConnection() as SqlConnection;     // Root session connection will be used...                
             else
             {
-                TraceLog.LogEntry("Transaction.Current: LocalId {0}\t - Status {1}", Transaction.Current.TransactionInformation.LocalIdentifier, Transaction.Current.TransactionInformation.Status);
-                connection = SqlClientUtility.GetTransactedSqlConnection(p_cnnMgr);
+                TraceLog.LogEntry("ExecuteNonQuery(): Transaction.Current: LocalId {0}\t - Status {1}", Transaction.Current.TransactionInformation.LocalIdentifier, Transaction.Current.TransactionInformation.Status);
+                m_sqlCnn = SqlClientUtility.GetTransactedSqlConnection(p_sessionTX);
                 m_mustCloseSqlCnn = false;
             }
-           
-            SqlCommand sqlc = null;
-            p_cnnMgr.Transaction.Enlist(sqlc = SqlClientUtility.CreateCommand(connection, CommandType.StoredProcedure, commandText, parameters));
 
-            if (p_cnnMgr.IsInActiveTransaction)
+            SqlCommand sqlc = SqlClientUtility.CreateCommand(m_sqlCnn as SqlConnection, CommandType.StoredProcedure, commandText, parameters);
+
+            if (p_sessionTX.IsInActiveTransaction)
             {
-                if (sqlc.Transaction != null)
-                {
-                    m_tx = String.Format("Transact 0x{0:X}", sqlc.Transaction.GetHashCode());
-                    m_mustCloseSqlCnn = false;
-                }
+                ITransaction tx = (p_sessionTX as SessionExt).Transaction;
+
+                TraceLog.LogEntry("ExecuteNonQuery(): p_cnnMgr currently manages an active Transaction (Hash 0x{0:X}) WasCommitted= {1} WasRolledBack= {2} command will be enlisted to...", tx.GetHashCode(), tx.WasCommitted, tx.WasRolledBack);
+                tx.Enlist(sqlc);                
+                m_tx = "Transact 0x" + sqlc.Transaction.GetHashCode().ToString("X");
+                m_mustCloseSqlCnn = false;                
             }
             
-
-
             res = sqlc.ExecuteNonQuery();
 
             if (m_mustCloseSqlCnn && sqlc.Connection.State == ConnectionState.Open) sqlc.Connection.Close();
 
             double mseg = TimeSpan.FromTicks(DateTime.Now.Ticks - ticks_t0).TotalMilliseconds;
-            TraceLog.LogEntry("ExecuteNonQuery(): Ejecutado SqlCmd bajo {0} sobre SqlConn 0x{1:X}. Tiempo {2} mseg.!", m_tx, sqlc.Connection.GetHashCode(), mseg);            
+            TraceLog.LogEntry("ExecuteNonQuery(): Executed command in Transaction {0} using SqlConn 0x{1:X}. Time {2} mseg.!", m_tx, sqlc.Connection.GetHashCode(), mseg);            
         }
 
-        public static void ExecuteNonQuery(ICnnManager p_cnnMgr, List<SqlCommand> p_lstSqlCmd)
+        public static void ExecuteNonQuery(ISessionTX p_sessionTX, List<SqlClientCommand> p_lstSqlCmd)
         {
 
-            int res = -1;
-            string m_tx = String.Empty;
-            int n = 0;
+            int res = -1;            
+            int n = p_lstSqlCmd.Count;
 
-            //if ((n = p_lstSqlCmd.Count) > 0)
-            //    SharpLogger.Nfo("p_lstSqlCmd.Count= {0} {1} [{2}..{3}]", n, p_lstSqlCmd[0].CommandText, Param2Str(p_lstSqlCmd[0].Parameters), Param2Str(p_lstSqlCmd[n - 1].Parameters));
-            //else
-            //    SharpLogger.Nfo("p_lstSqlCmd.Count= {0} [...]", n);
-
+            TraceLog.LogEntry("ExecuteNonQuery(): p_lstSqlCmd.Count= {0}", n);            
+                        
             long ticks_t0 = DateTime.Now.Ticks;
             IDbConnection m_sqlCnn = null;
 
             if (Transaction.Current == null)
-                m_sqlCnn = (p_cnnMgr.GetConnection());
+                m_sqlCnn = p_sessionTX.Connection; //(p_cnnMgr.GetConnection());
             else
-                m_sqlCnn = GetTransactedSqlConnection(p_cnnMgr);
+                m_sqlCnn = SqlClientUtility.GetTransactedSqlConnection(p_sessionTX);
+                                    
+            ITransaction tx = null;
 
-            SqlCommand sqlCmd = null;
-            m_tx = "SqlCmd Tran NULL";
-
-            for (int i = 0; i < n; i++)
+            if (p_sessionTX.IsInActiveTransaction)
             {
-                sqlCmd = p_lstSqlCmd[i];
-
-                if (m_sqlCnn != sqlCmd.Connection) sqlCmd.Connection = m_sqlCnn as SqlConnection;
-                p_cnnMgr.Transaction.Enlist(sqlCmd);
-
-                if (sqlCmd.Transaction != null) m_tx = String.Format("SqlCmd Tran 0x{0:X}", sqlCmd.Transaction.GetHashCode());
-
-                res = sqlCmd.ExecuteNonQuery();
-
-                TraceLog.LogEntry("ExecuteNonQuery(): {0} SqlCnn Hash 0x{1:X}. ExecNonQuery: {2} ({3}). Filas: {4}", m_tx, sqlCmd.Connection.GetHashCode(), sqlCmd.CommandText, "sqlCmd.Parameters", res);
+                tx = (p_sessionTX as SessionExt).Transaction;
+                TraceLog.LogEntry("ExecuteNonQuery(): p_cnnMgr currently manages an active Transaction (Hash 0x{0:X}) WasCommitted= {1} WasRolledBack= {2} command will be enlisted to...", tx.GetHashCode(), tx.WasCommitted, tx.WasRolledBack);                
+            }
+            else
+            {                
+                TraceLog.LogEntry("ExecuteNonQuery(): p_cnnMgr don't have active Transaction, SqlConnection(Hash 0x{0:X} State {1}) will create one and SqlCommand will be enlisted to it...", m_sqlCnn.GetHashCode(),m_sqlCnn.State);
+                tx = (p_sessionTX as SessionExt).BeginTransaction();                
             }
 
-            TraceLog.LogEntry("ExecuteNonQuery(): Ejecutado lote. Tiempo: {0} mseg.", TimeSpan.FromTicks(DateTime.Now.Ticks - ticks_t0).TotalMilliseconds);
-            ////SharpLogger.CallerOut();
+            using(tx)
+            {
+                bool commitBatch = false;
+
+                try
+                {
+                    SqlCommand p_cmdi = null;                        
+
+                    for (int i = 0; i < n; i++)
+                    {                        
+                        tx.Enlist(p_cmdi= SqlClientUtility.CreateCommand(m_sqlCnn as SqlConnection, CommandType.StoredProcedure, p_lstSqlCmd[i].CommandText, p_lstSqlCmd[i].Parameters));                       
+                        res = p_cmdi.ExecuteNonQuery();
+                        TraceLog.LogEntry("ExecuteNonQuery(): Command Transaction: 0x{0:X} SqlConn. 0x{1:X}. CommandText: {2} (Parms: {3}). res= {4}", p_cmdi.Transaction.GetHashCode(), p_cmdi.Connection.GetHashCode(), p_cmdi.CommandText, p_cmdi.Parameters.Count, res);
+                    }
+                    
+                    //throw new Exception("Por joder... para forzar un RollBack justo ahora...");
+
+                    commitBatch = true;
+                }
+                catch(Exception ex)
+                {
+                    TraceLog.LogEntry("Error ExecuteNonQuery(p_lstSqlCmd.Count= {0}): {1} ", p_lstSqlCmd.Count, ex.ToString());
+                    tx.Rollback();
+                }
+                finally
+                {
+                    if (commitBatch) tx.Commit();
+                }                
+            }
+
+            TraceLog.LogEntry("ExecuteNonQuery(): Command batch executed. Time: {0} mseg.", TimeSpan.FromTicks(DateTime.Now.Ticks - ticks_t0).TotalMilliseconds);            
         }
 
         /// <summary>
@@ -466,11 +479,11 @@ namespace SharpCore.Data
         /// <param name="p_cnnMgr">Name for connection manager on current session.</param> 
         /// <param name="p_sqlCmd">Built instance of SqlCommand to execute expecting a reader.</param>        
         /// <returns>A <see cref="SqlDataReader"/>Containing the results of the stored procedure execution.</returns>
-        public static SqlDataReader ExecuteReader(ICnnManager p_cnnMgr, string commandText, params SqlParameter[] parameters)
+        public static SqlDataReader ExecuteReader(ISessionTX p_sessionTX, string commandText, params SqlParameter[] parameters)
         {           
            
-            CommandBehavior beh = CommandBehavior.Default;           
-            SqlConnection connection = null;
+            CommandBehavior beh = CommandBehavior.Default;
+            IDbConnection m_sqlCnn = null;
 
             string strInfoExcep = String.Empty;
 
@@ -479,8 +492,8 @@ namespace SharpCore.Data
             try
             {               
                 if (Transaction.Current == null)
-                {                                        
-                    connection = p_cnnMgr.GetConnection() as SqlConnection;                    
+                {
+                    m_sqlCnn = p_sessionTX.Connection; //p_sesTX.ConnectionManager.GetConnection() as SqlConnection;                    
                     beh = CommandBehavior.CloseConnection;                    
                 }
                 else
@@ -490,10 +503,10 @@ namespace SharpCore.Data
                                         Transaction.Current.TransactionInformation.Status,
                                         Transaction.Current.TransactionInformation.CreationTime);
 
-                    connection = SqlClientUtility.GetTransactedSqlConnection(p_cnnMgr);                                       
+                    m_sqlCnn = SqlClientUtility.GetTransactedSqlConnection(p_sessionTX);                                       
                 }
-               
-                return SqlClientUtility.CreateCommand(connection, CommandType.StoredProcedure, commandText, parameters).ExecuteReader(beh);
+
+                return SqlClientUtility.CreateCommand(m_sqlCnn, CommandType.StoredProcedure, commandText, parameters).ExecuteReader(beh);
             }
             catch (Exception ex)
             {
@@ -516,35 +529,31 @@ namespace SharpCore.Data
         /// <param name="p_cnnMgr">The name of the connection string to use.</param>
         /// <returns>The SqlConnection associated with the current transaction.</returns>
         /// <remarks>If no SqlConnection exists, one will be created.</remarks>
-        private static SqlConnection GetTransactedSqlConnection(ICnnManager p_cnnMgr)
-        {
+        private static SqlConnection GetTransactedSqlConnection(ISessionTX p_sessionTX)
+        {            
             LocalDataStoreSlot connectionDictionarySlot = Thread.GetNamedDataSlot("ConnectionDictionary");
             Dictionary<string, SqlConnection> connectionDictionary = (Dictionary<string, SqlConnection>)Thread.GetData(connectionDictionarySlot);
 
             if (connectionDictionary == null)
             {
                 Thread.SetData(connectionDictionarySlot, connectionDictionary = new Dictionary<string, SqlConnection>());
-                TraceLog.LogEntry("GetTransactedSqlConnection()"," ThreadSlotCache era NULL, se instanció y luego se cacheará par ("+ p_cnnMgr.CnnStrName+",SqlConn) válido.");
+                TraceLog.LogEntry("GetTransactedSqlConnection()", "No Connection Dictionary Cache found in ThreadSlot -> Create and stored one.");
             }
 
             IDbConnection cnn = null;
 
-            if (connectionDictionary.ContainsKey(p_cnnMgr.CnnStrName))
+            if (connectionDictionary.ContainsKey(p_sessionTX.CnnStrName))
             {
-                cnn = connectionDictionary[p_cnnMgr.CnnStrName];
-
-                if (cnn.State != ConnectionState.Open)
-                    TraceLog.LogEntry("GetTransactedSqlConnection(): Key '{0}' CACHED in ThreadSlot, Maps -> valid SqlConn Hash 0x{1:X} State: {2}", p_cnnMgr.CnnStrName, cnn.GetHashCode(), cnn.State);                    
+                cnn = connectionDictionary[p_sessionTX.CnnStrName];
+                if (cnn!=null) TraceLog.LogEntry("GetTransactedSqlConnection(): Key '{0}' CACHED in ThreadSlot, Maps -> SqlConn Hash 0x{1:X} State: {2}", p_sessionTX.CnnStrName, cnn.GetHashCode(), cnn.State);                    
             }
             else
-            {
-                
-
-                if ((cnn = p_cnnMgr.GetConnection()) != null)  // Si es necesario, el manager la instancia y además la conecta...
+            {                
+                if ((cnn = (p_sessionTX as SessionExt).ConnectionManager.GetConnection()) != null)  // Si es necesario, el manager la instancia y además la conecta...
                 {
-                    connectionDictionary.Add(p_cnnMgr.CnnStrName, (cnn as SqlConnection));
+                    connectionDictionary.Add(p_sessionTX.CnnStrName, (cnn as SqlConnection));
 
-                    TraceLog.LogEntry("GetTransactedSqlConnection(): Key '{0}' NOT CACHED in ThreadSlot: Added SqlConn Hash 0x{1:X} State: {2}", p_cnnMgr.CnnStrName, cnn.GetHashCode(), cnn.State);                    
+                    TraceLog.LogEntry("GetTransactedSqlConnection(): Key '{0}' NOT CACHED in ThreadSlot: Added SqlConn Hash 0x{1:X} State: {2}", p_sessionTX.CnnStrName, cnn.GetHashCode(), cnn.State);                    
                     Transaction.Current.TransactionCompleted += new TransactionCompletedEventHandler(Current_TransactionCompleted);
                 }
             }

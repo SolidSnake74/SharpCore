@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Transactions;
-//using SharpCore.Logging;
-
-
 
 namespace SharpCore.Data
 {
@@ -70,8 +65,8 @@ namespace SharpCore.Data
         public abstract bool IsAutoCloseSessionEnabled { get; }
         public abstract bool ShouldAutoClose { get; }
 
-        public abstract TransactionScope GetTransactScope();
-        public abstract TransactionScope GetTransactScope(long tOut_mseg);
+        //public abstract TransactionScope GetTransactScope();
+        //public abstract TransactionScope GetTransactScope(long tOut_mseg);
 
         public abstract bool TransactionInProgress { get; }
         public abstract void AfterTransactionBegin(ITransaction tx);
@@ -92,18 +87,17 @@ namespace SharpCore.Data
 
         protected internal void SetClosed()
         {
-            //SharpLogger.CallerIn();
+            TraceLog.LogEntry("Session.SetClosed()");
 
             try
             {
-                if (TransactionContext != null)
-                    TransactionContext.Dispose();
+                if (this.TransactionContext != null) this.TransactionContext.Dispose();
             }
             catch (Exception)
             {
                 //ignore
             }
-            closed = true;
+            this.closed = true;
 
             //SharpLogger.CallerOut();
         }
@@ -116,7 +110,7 @@ namespace SharpCore.Data
 
         public bool IsClosed
         {
-            get { return closed; }
+            get { return this.closed; }
         }
 
         public override string ToString()

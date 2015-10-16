@@ -82,6 +82,7 @@
     <Compile Include="Session\SessionFactory.cs" />
     <Compile Include="Session\ThreadStaticSessionContext.cs" />
     <Compile Include="Session\TwoKeyDictionary.cs" />
+    <Compile Include="SqlClientCommand.cs" />
     <Compile Include="SqlClientUtility.cs" />
     <Compile Include="TraceLog.cs" />
   </ItemGroup>

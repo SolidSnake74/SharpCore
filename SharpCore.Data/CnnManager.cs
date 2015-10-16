@@ -28,13 +28,6 @@ namespace SharpCore.Data
         
         private ISessionTX m_session;
 
-        internal ISessionTX Session
-        {
-            get { return this.m_session; }
-        }
-
-       
-
         public string CnnStrName
         {
             get { return this.m_session.SessionFactory.CnnName; }
@@ -55,7 +48,7 @@ namespace SharpCore.Data
         {
             get
             {
-                if (transaction != null && transaction.IsActive)
+                if (this.transaction != null && this.transaction.IsActive)
                     return true;
                 else
                     return false; //session.Factory.TransactionFactory.IsInDistributedActiveTransaction(session);
@@ -154,11 +147,11 @@ namespace SharpCore.Data
 
         public void AfterTransaction()
         {
-            //SharpLogger.CallerIn();
+            TraceLog.LogEntry("CnnManager.AfterTransaction(): IsAfterTransactionRelease= {0} IsAggressiveRelease= {1}.", this.IsAfterTransactionRelease, this.IsAggressiveRelease);
 
-            if (IsAfterTransactionRelease)
+            if (this.IsAfterTransactionRelease)
             {
-                AggressiveRelease();
+                this.AggressiveRelease();
             }
             else if (IsAggressiveRelease && false) //&& batcher.HasOpenResources)
             {
@@ -172,21 +165,32 @@ namespace SharpCore.Data
                 //SharpLogger.Nfo("transaction completed on session with on_close connection release mode; be sure to close the session to release ADO.Net resources!");
             }
 
-            transaction = null;
+            
+
+            if (this.transaction != null)
+            {
+                TraceLog.LogEntry("CnnManager.AfterTransaction(): Managed Transaction 0x{0:X} Active: {1}  WasCommitted: {2} WasRolledBack: {3} will be setted to NULL.",
+                                   this.transaction.GetHashCode(), this.transaction.IsActive, this.transaction.WasCommitted, this.transaction.WasRolledBack);
+
+                this.transaction = null;
+            }
+            else
+                TraceLog.LogEntry("CnnManager.AfterTransaction(): Managed Transaction already is NULL.");
 
             //SharpLogger.CallerOut();
         }
 
         private void AggressiveRelease()
         {
-            TraceLog.LogEntry(this, "AggressiveRelease()");
+            TraceLog.LogEntry("CnnManager.AggressiveRelease(): ownConnection= {0} flushingFromDtcTransaction= {1}.", ownConnection, flushingFromDtcTransaction);
             
-            if (ownConnection && flushingFromDtcTransaction == false)
+            if(ownConnection && !flushingFromDtcTransaction)
             {
                 //SharpLogger.Nfo("aggressively releasing database connection");
 
                 if (this.m_connection != null)
                 {
+                    TraceLog.LogEntry("CnnManager.AggressiveRelease(): Connection 0x{0:X} State= {1} will be closed....", this.m_connection.GetHashCode(), this.m_connection.State);
                     this.CloseConnection();
                 }
             }    
@@ -241,26 +245,27 @@ namespace SharpCore.Data
     
         public ITransaction BeginTransaction(IsolationLevel isolationLevel)
         {
+            TraceLog.LogEntry("CnnManager.BeginTransaction({0}): this.transaction= 0x{1:X}",Enum.GetName(typeof(IsolationLevel),isolationLevel), (this.transaction == null) ? -1 : this.transaction.GetHashCode());
             Transaction.Begin(isolationLevel);
-            return transaction;
+            return this.transaction;
         }
 
         public ITransaction BeginTransaction()
         {
+            TraceLog.LogEntry("CnnManager.BeginTransaction(): this.transaction= 0x{0:X}", (this.transaction == null) ? -1 : this.transaction.GetHashCode());
             Transaction.Begin();
-            return transaction;
+            return this.transaction;
         }
 
         public ITransaction Transaction
         {
             get
             {
-                if (transaction == null)
+                if (this.transaction == null)
                 {
-                    transaction = new AdoTransaction(this.m_session);
-                    //session.Factory.TransactionFactory.CreateTransaction(session);
+                    this.transaction = new AdoTransaction(this.m_session);                    
                 }
-                return transaction;
+                return this.transaction;
             }
         }
 
@@ -285,7 +290,7 @@ namespace SharpCore.Data
             IDbConnection suppliedConnection = null;
 
 
-            TraceLog.LogEntry("CnnManager(): p_ses= {0} p_connectionReleaseMode= {1}", p_ses.SessionId, p_connectionReleaseMode);
+            TraceLog.LogEntry("CnnManager(p_ses= {0} p_connectionReleaseMode= {1})", p_ses.SessionId, p_connectionReleaseMode);
            
             this.m_session = p_ses;
             this.m_connection = suppliedConnection;
@@ -298,12 +303,13 @@ namespace SharpCore.Data
 
         static void CnnManager_StateChange(object sender, StateChangeEventArgs e)
         {
-            TraceLog.LogEntry("*** CnnManager_StateChange(SqlConnection: 0x{0:X}) {1} -> {2}", sender.GetHashCode(), e.OriginalState, e.CurrentState);
+            TraceLog.LogEntry("CnnManager_StateChange(SqlConnection: 0x{0:X}) {1} -> {2}", sender.GetHashCode(), e.OriginalState, e.CurrentState);
         }        
 
         public IDbConnection Close()
         {
-            //SharpLogger.CallerIn();
+            TraceLog.LogEntry("CnnManager.Close(): this.transaction= ", this.transaction == null ? "NULL" : ("0x" + this.transaction.GetHashCode().ToString("X") + " :IsActive= " + this.transaction.IsActive.ToString()));
+
 
             IDbConnection res = null;
          
@@ -323,7 +329,7 @@ namespace SharpCore.Data
             else
             {
                 
-                res= Disconnect();
+                res= this.Disconnect();
             }
 
             if (this.m_session != null)
@@ -338,7 +344,7 @@ namespace SharpCore.Data
 
         private void CloseConnection()
         {
-            //SharpLogger.CallerIn();
+            TraceLog.LogEntry("CnnManager.CloseConnection(0x{0:X})", this.m_connection.GetHashCode());
             
             if (this.m_connection != null)
             {
@@ -353,48 +359,42 @@ namespace SharpCore.Data
 
         public IDbConnection Disconnect()
         {
-            //SharpLogger.CallerIn();
-            
+            TraceLog.LogEntry("CnnManager.Disconnect(): IsInActiveTransaction= {0}.", IsInActiveTransaction);
+    
             if (IsInActiveTransaction)
                 throw new InvalidOperationException("Disconnect cannot be called while a transaction is in progress.");
-
             try
-            {              
-                DisconnectOwnConnection();
-                ownConnection = false;
+            {
+                if (this.m_connection != null)
+                {
+                    TraceLog.LogEntry("CnnManager.Disconnect(): Connection 0x{0:X} State= {1} will be disconnected....", this.m_connection.GetHashCode(), this.m_connection.State);
+                    this.DisconnectOwnConnection();
+                }
+                else
+                    TraceLog.LogEntry("CnnManager.Disconnect(): Connection is NULL.");
+
+                this.ownConnection = false;
 
                 return null;             
             }
             finally
-            {
-                // Ensure that AfterTransactionCompletion gets called since
-                // it takes care of the locks and cache.
+            {                                
                 if (!IsInActiveTransaction)
                 {
-                    // We don't know the state of the transaction
-                    this.m_session.AfterTransactionCompletion(false, null);
+                    TraceLog.LogEntry("CnnManager.Disconnect(): Ensure that this.m_session.AfterTransactionCompletion() gets called since it takes care of the locks and cache...");
+                    this.m_session.AfterTransactionCompletion(false, null); // We don't know the state of the transaction
                 }
 
                 //SharpLogger.CallerOut();
-            }
-
-           
+            }           
         }
 
        
 
         private void DisconnectOwnConnection()
         {
-            //SharpLogger.CallerIn();
-
-            if (this.m_connection == null)
-            {
-                return;  // No active connection
-            }
-          
-            CloseConnection();
-
-            //SharpLogger.CallerOut();
+            TraceLog.LogEntry("CnnManager.DisconnectOwnConnection(0x{0:X})", this.m_connection.GetHashCode());            
+            this.CloseConnection();            
         }
    
 
@@ -417,7 +417,7 @@ namespace SharpCore.Data
 
             TraceLog.LogEntry("CnnManager.Dispose(disposing= {0})", p_disposing);
 
-            if (!m_disposed)
+            if (!this.m_disposed)
             {
                 this.Close();
 
@@ -437,11 +437,11 @@ namespace SharpCore.Data
                 //    SharpLogger.Nfo("Dispose() transaction NULL");
 
                 GC.SuppressFinalize(this);  // nothing for Finalizer to do - so tell the GC to ignore it
-
                 this.m_disposed = true;
             }
-            //else
-                //SharpLogger.Nfo("instance already disposed...");
+             else
+                TraceLog.LogEntry("CnnManager.Dispose(): instance already disposed...");
+                
 
             //SharpLogger.CallerOut();
         }

@@ -24,8 +24,11 @@ namespace SharpCore.Data
         bool SupportsMultipleOpenReaders { get; }
         bool SupportsMultipleQueries { get; }
         string ToString();
-        ITransaction Transaction { get; }
+        
+        //ITransaction Transaction { get; }
 
-        //void CommandReader_Done(object p_pk);      
+        ////ISession Session { get; }
+
+        ////void CommandReader_Done(object p_pk);      
     }
 }
