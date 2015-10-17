@@ -68,67 +68,9 @@ namespace SharpCore.Data.Testing
 		}
 		#endregion
 
+               
         [TestMethod]
-        public void TransactionTest_Session()
-        {
-            SessionFactory sf = new SessionFactory("ConnectionString");
-           
-            if(sf!= null)
-            {                               
-                SqlDataReader dr = null;
-                SqlDataReader dr2 = null;
-                                
-                using (ISessionTX ses = sf.OpenSession() as ISessionTX)
-                {                    
-                    dr = SqlClientUtility.ExecuteReader(ses, "PadreSelectAll");
-                    dr.Close();
-                   
-                    dr2 = SqlClientUtility.ExecuteReader(ses, "HijoSelectAllByPadre", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32){Value=0} });
-                    dr2.Close();
-                }
-
-                sf.Close();
-            }
-            
-        }
-
-        [TestMethod]
-        public void TransactionTest_Session_update()
-        {
-            SessionFactory sf = new SessionFactory("ConnectionString");
-
-            if (sf != null)
-            {
-                SqlDataReader dr = null;
-                SqlDataReader dr2 = null;
-
-                using (ISessionTX ses = sf.OpenSession() as ISessionTX)
-                {
-                    using (TransactionScope tx = ses.GetTransactScope())
-                    {
-                        SqlClientUtility.ExecuteNonQuery(ses, "PadreUpdate", new SqlParameter[] { new SqlParameter("@Id", DbType.Int32) { Value = 0 }, 
-                                                                                                                  new SqlParameter("@Nombre", DbType.String) { Value = DateTime.Now.ToLongTimeString() }});
-
-                        SqlClientUtility.ExecuteNonQuery(ses, "PadreUpdate", new SqlParameter[] { new SqlParameter("@Id", DbType.Int32) { Value = 1 }, 
-                                                                                                                  new SqlParameter("@Nombre", DbType.String) { Value = DateTime.Now.ToLongTimeString() }});
-
-                        tx.Complete();
-                    }
-
-                    dr = SqlClientUtility.ExecuteReader(ses, "PadreSelectAll");
-                    dr.Close();
-
-                    dr2 = SqlClientUtility.ExecuteReader(ses, "HijoSelectAllByPadre", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 0 } });
-                    dr2.Close();
-                }
-
-                sf.Close();
-            }
-
-        }
-
-        [TestMethod]
-        public void TransactionTest_Session_update2()
+        public void Transaction_ScopeCommit_Test()
         {
             SessionFactory sf = new SessionFactory("ConnectionString");
 
@@ -136,42 +78,59 @@ namespace SharpCore.Data.Testing
             {
                 using (ISessionTX ses = sf.OpenSession() as ISessionTX)
                 {
-                    string str_val = string.Format("{0}", DateTime.Now.TimeOfDay);
-                                       
-                    List<SqlClientCommand> lst_SqlCmd = new List<SqlClientCommand>(new SqlClientCommand[] 
-                        {                         
-                            new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 0 }, 
-                                                                                    new SqlParameter("@Id", DbType.Int32) { Value = 0 }, 
-                                                                                    new SqlParameter("@Nombre", DbType.String) { Value = "P0.h0-" + str_val } }),
-                            new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 0 }, 
-                                                                                    new SqlParameter("@Id", DbType.Int32) { Value = 1 }, 
-                                                                                    new SqlParameter("@Nombre", DbType.String) { Value = "P0.h1-" + str_val } }),
-                            new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 0 }, 
-                                                                                    new SqlParameter("@Id", DbType.Int32) { Value = 2 }, 
-                                                                                    new SqlParameter("@Nombre", DbType.String) { Value = "P0.h2-" + str_val } }),
-                            new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32) { Value = 0 }, 
-                                                                                    new SqlParameter("@Id", DbType.Int32) { Value = 3 }, 
-                                                                                    new SqlParameter("@Nombre", DbType.String) { Value = "P0.h3-" + str_val } })
-                        });
+                    string str_val = DateTime.Now.TimeOfDay.ToString();
+                    
+                    SqlClientCommand sqlCmdPadre= new SqlClientCommand("PadreUpdate", new SqlParameter[] { new SqlParameter("@Id", DbType.Int32) { Value = 0 }, 
+                                                                                                           new SqlParameter("@Nombre", DbType.String) { Value = "P0-" + str_val }});
 
+                    List<SqlClientCommand> lst_SqlCmdUpd = new List<SqlClientCommand>(new SqlClientCommand[] 
+                    {                         
+                        new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32)    { Value = 0 }, 
+                                                                                new SqlParameter("@Id", DbType.Int32)       { Value = 0 }, 
+                                                                                new SqlParameter("@Nombre", DbType.String)  { Value = "P0.h0-" + str_val }}),
+                        new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32)    { Value = 0 }, 
+                                                                                new SqlParameter("@Id", DbType.Int32)       { Value = 1 }, 
+                                                                                new SqlParameter("@Nombre", DbType.String)  { Value = "P0.h1-" + str_val }}),
+                        new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32)    { Value = 0 }, 
+                                                                                new SqlParameter("@Id", DbType.Int32)       { Value = 2 }, 
+                                                                                new SqlParameter("@Nombre", DbType.String)  { Value = "P0.h2-" + str_val }}),
+                        new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32)    { Value = 0 }, 
+                                                                                new SqlParameter("@Id", DbType.Int32)       { Value = 3 }, 
+                                                                                new SqlParameter("@Nombre", DbType.String)  { Value = "P0.h3-" + str_val }}),
+                        new SqlClientCommand("HijoUpdate", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32)    { Value = 0 }, 
+                                                                                new SqlParameter("@Id", DbType.Int32)       { Value = 4 }, 
+                                                                                new SqlParameter("@Nombre", DbType.String)  { Value = "P0.h4-" + str_val }})
+                    });
+
+                    int idPadre = 0;
+                    int idBase  = 5;
+
+                    List<SqlClientCommand> lst_SqlCmdIns = new List<SqlClientCommand>(new SqlClientCommand[] 
+                    {                         
+                        new SqlClientCommand("HijoInsert", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32)    { Value = idPadre }, 
+                                                                                new SqlParameter("@Id", DbType.Int32)       { Value = idBase }, 
+                                                                                new SqlParameter("@Nombre", DbType.String)  { Value = string.Format("P{0}.h{1}-{2}",idPadre, idBase, str_val) }}),
+                        new SqlClientCommand("HijoInsert", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32)    { Value = idPadre }, 
+                                                                                new SqlParameter("@Id", DbType.Int32)       { Value = idBase+1 }, 
+                                                                                new SqlParameter("@Nombre", DbType.String)  { Value = string.Format("P{0}.h{1}-{2}",idPadre, idBase+1, str_val) }}),
+                        new SqlClientCommand("HijoInsert", new SqlParameter[] { new SqlParameter("@Padre", DbType.Int32)    { Value = idPadre }, 
+                                                                                new SqlParameter("@Id", DbType.Int32)       { Value = idBase+2 }, 
+                                                                                new SqlParameter("@Nombre", DbType.String)  { Value = string.Format("P{0}.h{1}-{2}",idPadre, idBase+2, str_val) }})                            
+                    });
+
+                                            
+                    //using(TransactionScope ts = ses.GetTransactScope())                    
                     try
                     {
-                        
-                        using (TransactionScope ts = ses.GetTransactScope())
-                        {                       
-                            SqlClientUtility.ExecuteNonQuery(ses, "PadreUpdate", new SqlParameter[] { new SqlParameter("@Id", DbType.Int32) { Value = 0 }, 
-                                                                                                      new SqlParameter("@Nombre", DbType.String) { Value = "P0-" + str_val } });
-                            SqlClientUtility.ExecuteNonQuery(ses, lst_SqlCmd);
-                            
-                            ts.Complete();
-                        }
+                        SqlClientUtility.ExecuteNonQuery(ses, sqlCmdPadre);
+                        SqlClientUtility.ExecuteNonQuery(ses, lst_SqlCmdUpd);
+                        SqlClientUtility.ExecuteNonQuery(ses, lst_SqlCmdIns);
+
+                        //ts.Complete();  // Transaction Manager will commit entire scope while disposing... Otherwise, will be RollBacked.
                     }
-                    catch (TransactionAbortedException ex)
-                    {
-                        System.Diagnostics.Trace.WriteLine("TransactionAbortedException Message: " + ex.Message);
-                    }
-                    finally
-                    {
+                    catch(SqlException ex)
+                    {                            
+                        System.Diagnostics.Trace.WriteLine("SqlException into Scope: " + ex.ToString());
                     }
                 }
 

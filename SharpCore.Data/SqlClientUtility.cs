@@ -370,13 +370,13 @@ namespace SharpCore.Data
 
         #region newest CreateCommand & ExecuteNonQuery & ExecuteReader
 
-        public static void ExecuteNonQuery(ISessionTX p_sessionTX, string commandText, params SqlParameter[] parameters)
-        {                        
-            TraceLog.LogEntry("ExecuteNonQuery(): commandText= {0} parameters= {1}", commandText, parameters.Length);
-
+        public static void ExecuteNonQuery(ISessionTX p_sessionTX, SqlClientCommand p_command)
+        {
+            TraceLog.LogEntry("ExecuteNonQuery(): Command {0} {1}", p_command.CommandText, p_command.ParametersDescr);
+            
             int res = -1;
             bool m_mustCloseSqlCnn = true;
-            string m_tx = "NONE";
+            string m_tx = "Transact NONE";
             IDbConnection m_sqlCnn = null;
             string strInfoExcep = String.Empty;
 
@@ -391,13 +391,13 @@ namespace SharpCore.Data
                 m_mustCloseSqlCnn = false;
             }
 
-            SqlCommand sqlc = SqlClientUtility.CreateCommand(m_sqlCnn as SqlConnection, CommandType.StoredProcedure, commandText, parameters);
+            SqlCommand sqlc = SqlClientUtility.CreateCommand(m_sqlCnn as SqlConnection, CommandType.StoredProcedure, p_command.CommandText, p_command.Parameters);
 
             if (p_sessionTX.IsInActiveTransaction)
             {
                 ITransaction tx = (p_sessionTX as SessionExt).Transaction;
 
-                TraceLog.LogEntry("ExecuteNonQuery(): p_cnnMgr currently manages an active Transaction (Hash 0x{0:X}) WasCommitted= {1} WasRolledBack= {2} command will be enlisted to...", tx.GetHashCode(), tx.WasCommitted, tx.WasRolledBack);
+                TraceLog.LogEntry("ExecuteNonQuery(): p_sessionTX has an active Transaction (0x{0:X} WasCommitted= {1} WasRolledBack= {2}) Command will be enlisted to...", tx.GetHashCode(), tx.WasCommitted, tx.WasRolledBack);
                 tx.Enlist(sqlc);                
                 m_tx = "Transact 0x" + sqlc.Transaction.GetHashCode().ToString("X");
                 m_mustCloseSqlCnn = false;                
@@ -408,16 +408,14 @@ namespace SharpCore.Data
             if (m_mustCloseSqlCnn && sqlc.Connection.State == ConnectionState.Open) sqlc.Connection.Close();
 
             double mseg = TimeSpan.FromTicks(DateTime.Now.Ticks - ticks_t0).TotalMilliseconds;
-            TraceLog.LogEntry("ExecuteNonQuery(): Executed command in Transaction {0} using SqlConn 0x{1:X}. Time {2} mseg.!", m_tx, sqlc.Connection.GetHashCode(), mseg);            
+            TraceLog.LogEntry("ExecuteNonQuery(): Command Executed, {0} SqlConn 0x{1:X}. Time {2} mseg.", m_tx, sqlc.Connection.GetHashCode(), mseg);            
         }
 
         public static void ExecuteNonQuery(ISessionTX p_sessionTX, List<SqlClientCommand> p_lstSqlCmd)
         {
 
-            int res = -1;            
-            int n = p_lstSqlCmd.Count;
-
-            TraceLog.LogEntry("ExecuteNonQuery(): p_lstSqlCmd.Count= {0}", n);            
+            int res = -1;                       
+            TraceLog.LogEntry("ExecuteNonQuery(): p_lstSqlCmd.Count= {0}", p_lstSqlCmd.Count);            
                         
             long ticks_t0 = DateTime.Now.Ticks;
             IDbConnection m_sqlCnn = null;
@@ -432,45 +430,42 @@ namespace SharpCore.Data
             if (p_sessionTX.IsInActiveTransaction)
             {
                 tx = (p_sessionTX as SessionExt).Transaction;
-                TraceLog.LogEntry("ExecuteNonQuery(): p_cnnMgr currently manages an active Transaction (Hash 0x{0:X}) WasCommitted= {1} WasRolledBack= {2} command will be enlisted to...", tx.GetHashCode(), tx.WasCommitted, tx.WasRolledBack);                
+                TraceLog.LogEntry("ExecuteNonQuery(): p_sessionTX is in active Transaction (Hash 0x{0:X}) WasCommitted= {1} WasRolledBack= {2}). Command batch will be enlisted to...", tx.GetHashCode(), tx.WasCommitted, tx.WasRolledBack);                
             }
             else
-            {                
-                TraceLog.LogEntry("ExecuteNonQuery(): p_cnnMgr don't have active Transaction, SqlConnection(Hash 0x{0:X} State {1}) will create one and SqlCommand will be enlisted to it...", m_sqlCnn.GetHashCode(),m_sqlCnn.State);
+            {
+                TraceLog.LogEntry("ExecuteNonQuery(): p_sessionTX not in active Transaction, SqlConnection (Hash 0x{0:X} State {1}) will create one to enlist command batch...", m_sqlCnn.GetHashCode(), m_sqlCnn.State);
                 tx = (p_sessionTX as SessionExt).BeginTransaction();                
             }
 
             using(tx)
             {
-                bool commitBatch = false;
-
+                //bool commitBatch = false;
+                
                 try
                 {
-                    SqlCommand p_cmdi = null;                        
+                    SqlCommand p_cmdi = null;
 
-                    for (int i = 0; i < n; i++)
+                    for (int i = 0; i < p_lstSqlCmd.Count; i++)
                     {                        
-                        tx.Enlist(p_cmdi= SqlClientUtility.CreateCommand(m_sqlCnn as SqlConnection, CommandType.StoredProcedure, p_lstSqlCmd[i].CommandText, p_lstSqlCmd[i].Parameters));                       
-                        res = p_cmdi.ExecuteNonQuery();
-                        TraceLog.LogEntry("ExecuteNonQuery(): Command Transaction: 0x{0:X} SqlConn. 0x{1:X}. CommandText: {2} (Parms: {3}). res= {4}", p_cmdi.Transaction.GetHashCode(), p_cmdi.Connection.GetHashCode(), p_cmdi.CommandText, p_cmdi.Parameters.Count, res);
+                        tx.Enlist(p_cmdi= SqlClientUtility.CreateCommand(m_sqlCnn as SqlConnection, CommandType.StoredProcedure, p_lstSqlCmd[i].CommandText, p_lstSqlCmd[i].Parameters));
+                        TraceLog.LogEntry("ExecuteNonQuery(): Command ({2} {3}) SqlConn. 0x{0:X} Trans. 0x{1:X}", p_cmdi.Connection.GetHashCode(), p_cmdi.Transaction.GetHashCode(), p_cmdi.CommandText, p_lstSqlCmd[i].ParametersDescr);
+                        res = p_cmdi.ExecuteNonQuery();                        
                     }
                     
                     //throw new Exception("Por joder... para forzar un RollBack justo ahora...");
 
-                    commitBatch = true;
+                    //commitBatch = true;
+                    tx.Commit();
+                    TraceLog.LogEntry("ExecuteNonQuery(): Command batch Commited. Time: {0} mseg.", TimeSpan.FromTicks(DateTime.Now.Ticks - ticks_t0).TotalMilliseconds);
                 }
                 catch(Exception ex)
                 {
-                    TraceLog.LogEntry("Error ExecuteNonQuery(p_lstSqlCmd.Count= {0}): {1} ", p_lstSqlCmd.Count, ex.ToString());
+                    TraceLog.LogEntry("Error ExecuteNonQuery(): " + ex.ToString());
                     tx.Rollback();
-                }
-                finally
-                {
-                    if (commitBatch) tx.Commit();
-                }                
-            }
-
-            TraceLog.LogEntry("ExecuteNonQuery(): Command batch executed. Time: {0} mseg.", TimeSpan.FromTicks(DateTime.Now.Ticks - ticks_t0).TotalMilliseconds);            
+                    if (ex is SqlException) throw ex;
+                }                                
+            }                        
         }
 
         /// <summary>

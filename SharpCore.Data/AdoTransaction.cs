@@ -31,16 +31,13 @@ namespace SharpCore.Data
         }
 
         public void Begin()
-        {
-            //SharpLogger.CallerIn();
-            this.Begin(IsolationLevel.Unspecified);
-            //SharpLogger.CallerOut();
+        {            
+            this.Begin(IsolationLevel.Unspecified);           
         }
 
         public void Begin(IsolationLevel isolationLevel)
         {
-            //SharpLogger.CallerIn();
-
+            
             if (begun)
             {
                 return;
@@ -55,9 +52,7 @@ namespace SharpCore.Data
             {
                 isolationLevel = IsolationLevel.Serializable; //session.Factory.Settings.IsolationLevel;
             }
-
             
-
             try
             {
                 IDbConnection m_DbConn = session.Connection;
@@ -70,29 +65,22 @@ namespace SharpCore.Data
                     m_DbConn.Open();
                 }
 
-                if (isolationLevel == IsolationLevel.Unspecified)
-                {
-                    trans = m_DbConn.BeginTransaction();
-                }
-                else
-                {
+                if (isolationLevel == IsolationLevel.Unspecified)                
+                    trans = m_DbConn.BeginTransaction();                
+                else                
                     trans = m_DbConn.BeginTransaction(isolationLevel);
-                }
-
+                
                 begun = true;
                 committed = false;
                 rolledBack = false;
 
             }
             catch (Exception e)
-            {
-                //SharpLogger.Nfo("Begin transaction failed {0}", e.ToString());
-                throw new System.Transactions.TransactionException("Begin failed with SQL exception", e);
+            {                
+                throw new System.Transactions.TransactionException("Begin Transaction failed with SQL exception: ", e);
             }
 
-            session.AfterTransactionBegin(this);
-
-            //SharpLogger.CallerOut();
+            this.session.AfterTransactionBegin(this);            
         }
 
 

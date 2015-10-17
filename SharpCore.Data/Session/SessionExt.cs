@@ -101,7 +101,7 @@ namespace SharpCore.Data
         public TransactionScope GetTransactScope(long tOut_mseg)
         {                       
             TransactionScope ts= new TransactionScope(TransactionScopeOption.Required, TimeSpan.FromMilliseconds(tOut_mseg));
-            TraceLog.LogEntry("SessionExt.GetTransactScope(tOut_mseg= {0}): SessionId= {1}", tOut_mseg, this.sessionId);            
+            TraceLog.LogEntry("SessionExt.GetTransactScope(tOut_mseg= {0}): SessionId= {1}", tOut_mseg, this.sessionId);                        
             return ts;            
         }
         

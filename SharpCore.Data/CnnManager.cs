@@ -252,9 +252,7 @@ namespace SharpCore.Data
 
         public ITransaction BeginTransaction()
         {
-            TraceLog.LogEntry("CnnManager.BeginTransaction(): this.transaction= 0x{0:X}", (this.transaction == null) ? -1 : this.transaction.GetHashCode());
-            Transaction.Begin();
-            return this.transaction;
+            return this.BeginTransaction(IsolationLevel.Unspecified);          
         }
 
         public ITransaction Transaction
@@ -378,15 +376,10 @@ namespace SharpCore.Data
                 return null;             
             }
             finally
-            {                                
-                if (!IsInActiveTransaction)
-                {
-                    TraceLog.LogEntry("CnnManager.Disconnect(): Ensure that this.m_session.AfterTransactionCompletion() gets called since it takes care of the locks and cache...");
-                    this.m_session.AfterTransactionCompletion(false, null); // We don't know the state of the transaction
-                }
-
-                //SharpLogger.CallerOut();
-            }           
+            {               
+                //TraceLog.LogEntry("CnnManager.Disconnect(): Ensure that this.m_session.AfterTransactionCompletion() gets called since it takes care of the locks and cache...");
+                //this.m_session.AfterTransactionCompletion(false, null); // We don't know the state of the transaction                               
+            }         
         }
 
        
